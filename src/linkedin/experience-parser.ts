@@ -39,21 +39,17 @@ export class LinkedInExperienceParser implements ExperienceParser {
   parse(response: string): Experience[] {
     const $ = load(response);
 
-    // The details view is an RSC navigation shell. Its cards are emitted as
-    // top-level serialized nodes, so they are siblings rather than children
-    // of the view marker.
-    const hasExperienceView = $(
-      '[data-view-name="profile-experience-details-view"]',
-    ).length > 0;
+    // Note: profile-experience-details-view exists in the DOM but does
+    // NOT wrap the actual position cards (confirmed empirically - it's
+    // effectively an empty shell/boundary marker). The cards live
+    // elsewhere in the document, so we search the whole page instead
+    // of scoping to that container.
+    //
+    // Each position is a repeating card keyed by a stable, non-hashed
+    // attribute. LinkedIn's class names are hashed/obfuscated and churn
+    // on deploy, so we deliberately avoid selecting on them.
+    const cards = $('[componentkey^="entity-collection-item-"]');
 
-    if (!hasExperienceView) {
-      return [];
-    }
-
-    const cards = $(
-      '[componentkey^="entity-collection-item-"]',
-    );
-  
     const experience: Experience[] = [];
 
     cards.each((_, element) => {
@@ -70,11 +66,9 @@ export class LinkedInExperienceParser implements ExperienceParser {
   private parseCard($: CheerioRoot, card: CheerioNode): Experience | null {
     // The description lives in its own paragraph, outside the company
     // link, keyed by a stable test id.
-    const paragraphs = card
-      .find('p')
-      .map((_, el) => cleanText($(el).text()))
-      .get()
-      .filter((value): value is string => value !== null);
+    const descriptionNode = card
+      .find('[data-testid="expandable-text-box"]')
+      .first();
 
     // When a position has a linked company page, title/company/dates/
     // location are the (in-order) <p> descendants of that <a>. Not every
@@ -83,8 +77,30 @@ export class LinkedInExperienceParser implements ExperienceParser {
     // card, stopping before the description paragraph.
     const companyLink = card.find('a[href*="/company/"]').first();
 
-    const [titleRaw, companyRaw, datesRaw, locationRaw, descriptionRaw] =
-      paragraphs;
+    let paragraphs: string[];
+
+    if (companyLink.length) {
+      paragraphs = companyLink
+        .find('p')
+        .map((_, el) => cleanText($(el).text()))
+        .get()
+        .filter((value): value is string => value !== null);
+    } else {
+      paragraphs = card
+        .find('p')
+        .filter((_, el) => {
+          return (
+            descriptionNode.length === 0 ||
+            el !== descriptionNode.get(0)
+          );
+        })
+        .map((_, el) => cleanText($(el).text()))
+        .get()
+        .filter((value): value is string => value !== null)
+        .slice(0, 4);
+    }
+
+    const [titleRaw, companyRaw, datesRaw, locationRaw] = paragraphs;
 
     if (!titleRaw && !companyRaw) {
       // Nothing recognizable on this card - skip it rather than emit
@@ -98,7 +114,7 @@ export class LinkedInExperienceParser implements ExperienceParser {
       title: titleRaw ?? null,
       company: this.stripTrailingMeta(companyRaw),
       location: this.stripTrailingMeta(locationRaw),
-      description: cleanText(descriptionRaw),
+      description: this.parseDescription($, descriptionNode),
       startDate,
       endDate,
       image: getImageUrl(card, 'figure[data-view-name="image"] img'),
