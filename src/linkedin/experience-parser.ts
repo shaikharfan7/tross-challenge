@@ -64,43 +64,14 @@ export class LinkedInExperienceParser implements ExperienceParser {
   }
 
   private parseCard($: CheerioRoot, card: CheerioNode): Experience | null {
-    // The description lives in its own paragraph, outside the company
-    // link, keyed by a stable test id.
-    const descriptionNode = card
-      .find('[data-testid="expandable-text-box"]')
-      .first();
+    const paragraphs = card
+      .find('p')
+      .map((_, el) => cleanText($(el).text()))
+      .get()
+      .filter((value): value is string => value !== null);
 
-    // When a position has a linked company page, title/company/dates/
-    // location are the (in-order) <p> descendants of that <a>. Not every
-    // position links to a company page (e.g. unlisted/smaller companies),
-    // so fall back to reading the same <p> sequence directly off the
-    // card, stopping before the description paragraph.
-    const companyLink = card.find('a[href*="/company/"]').first();
-
-    let paragraphs: string[];
-
-    if (companyLink.length) {
-      paragraphs = companyLink
-        .find('p')
-        .map((_, el) => cleanText($(el).text()))
-        .get()
-        .filter((value): value is string => value !== null);
-    } else {
-      paragraphs = card
-        .find('p')
-        .filter((_, el) => {
-          return (
-            descriptionNode.length === 0 ||
-            el !== descriptionNode.get(0)
-          );
-        })
-        .map((_, el) => cleanText($(el).text()))
-        .get()
-        .filter((value): value is string => value !== null)
-        .slice(0, 4);
-    }
-
-    const [titleRaw, companyRaw, datesRaw, locationRaw] = paragraphs;
+    const [titleRaw, companyRaw, datesRaw, locationRaw, descriptionRaw] =
+      paragraphs;
 
     if (!titleRaw && !companyRaw) {
       // Nothing recognizable on this card - skip it rather than emit
@@ -114,7 +85,7 @@ export class LinkedInExperienceParser implements ExperienceParser {
       title: titleRaw ?? null,
       company: this.stripTrailingMeta(companyRaw),
       location: this.stripTrailingMeta(locationRaw),
-      description: this.parseDescription($, descriptionNode),
+      description: cleanText(descriptionRaw),
       startDate,
       endDate,
       image: getImageUrl(card, 'figure[data-view-name="image"] img'),
