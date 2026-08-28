@@ -1,3 +1,4 @@
+import { writeFile } from 'fs/promises';
 import { LinkedInSessionError, UpstreamError } from '../errors.js';
 
 export interface LinkedInClientOptions {
@@ -35,6 +36,15 @@ export class LinkedInClient {
     if (!response.ok) {
       throw new UpstreamError(`LinkedIn request failed with status ${response.status}.`);
     }
+
+
+    const html = await response.text();
+
+await writeFile('/tmp/linkedin-profile.html', html);
+
+return html;
+
+
 
     return response.text();
   }
