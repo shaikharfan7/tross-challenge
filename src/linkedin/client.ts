@@ -44,7 +44,6 @@ export class LinkedInClient {
       '/tmp/linkedin-profile.html',
       html,
     );
-    
 
     return html;
   }
@@ -52,64 +51,79 @@ export class LinkedInClient {
   /**
    * Fetches the LinkedIn Experience component response.
    */
-  // async fetchExperience(url: string): Promise<string> {
-  //   this.assertSession();
-
-  //   const experienceUrl = new URL(
-  //     'details/experience/',
-  //     url.endsWith('/') ? url : `${url}/`,
-  //   );
-
-  //   const response = await this.fetchImpl(
-  //     experienceUrl,
-  //     {
-  //       headers: this.createHeaders({
-  //         accept:
-  //           'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-  //       }),
-  //     },
-  //   );
-
-  //    await writeFile(
-  //     '/tmp/linkedin-profile.html',
-  //     await response.text(),
-  //   );
-
-  //   this.assertResponse(response);
-
-  //   return response.text();
-  // }
-
   async fetchExperience(url: string): Promise<string> {
-  this.assertSession();
+    this.assertSession();
 
-  const experienceUrl = new URL(
-    'details/experience/',
-    url.endsWith('/') ? url : `${url}/`,
-  );
+    const experienceUrl = new URL(
+      'details/experience/',
+      url.endsWith('/') ? url : `${url}/`,
+    );
 
-  const response = await this.fetchImpl(
-    experienceUrl,
-    {
-      headers: this.createHeaders({
-        accept:
-          'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      }),
-    },
-  );
+    const response = await this.fetchImpl(
+      experienceUrl,
+      {
+        headers: this.createHeaders({
+          accept:
+            'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        }),
+      },
+    );
 
-  this.assertResponse(response);
+    this.assertResponse(response);
 
-  const html = await response.text();
+    const html = await response.text();
 
-  // Temporary debugging output.
-  await writeFile(
-    '/tmp/linkedin-experience.html',
-    html,
-  );
+    // Temporary debugging output.
+    await writeFile(
+      '/tmp/linkedin-experience.html',
+      html,
+    );
 
-  return html;
-}
+    return html;
+  }
+
+  /**
+   * Fetches the LinkedIn Skills component response.
+   *
+   * Same pattern as fetchExperience: a direct authenticated GET against
+   * the details/skills/ page, no headless browser and no internal
+   * rsc-action replay. This depends on the skills list being present in
+   * this page's server-rendered HTML rather than requiring a separate
+   * lazy-loaded action - that assumption needs to be verified against a
+   * real fixture the same way experience was (see
+   * LinkedInExperienceParser's dev notes) before trusting the parser
+   * output.
+   */
+  async fetchSkills(url: string): Promise<string> {
+    this.assertSession();
+
+    const skillsUrl = new URL(
+      'details/skills/',
+      url.endsWith('/') ? url : `${url}/`,
+    );
+
+    const response = await this.fetchImpl(
+      skillsUrl,
+      {
+        headers: this.createHeaders({
+          accept:
+            'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        }),
+      },
+    );
+
+    this.assertResponse(response);
+
+    const html = await response.text();
+
+    // Temporary debugging output.
+    await writeFile(
+      '/tmp/linkedin-skills.html',
+      html,
+    );
+
+    return html;
+  }
 
   private assertSession(): void {
     if (!this.options.liAt) {

@@ -15,7 +15,7 @@ function cleanText(value: string | undefined | null): string | null {
 
 function getImageUrl(
   $: ReturnType<typeof load>,
-  selector: string
+  selector: string,
 ): string | null {
   return $(selector).first().attr('src') ?? null;
 }
@@ -23,12 +23,55 @@ function getImageUrl(
 export class LinkedInProfilePageParser implements ProfilePageParser {
   parse(url: string, html: string): Profile {
     const $ = load(html);
+    const root = $('body');
 
-    // IMPORTANT:
-    // Only search inside the actual profile card.
     const topCard = $('[data-view-name="profile-top-card"]').first();
+    const cardScope = topCard.length ? topCard : root;
 
-    if (!topCard.length) {
+    const h2Texts = cardScope
+      .find('h2')
+      .map((_, element) => cleanText($(element).text()))
+      .get()
+      .filter((value): value is string => value !== null);
+
+    const pTexts = cardScope
+      .find('p')
+      .map((_, element) => cleanText($(element).text()))
+      .get()
+      .filter((value): value is string => value !== null);
+
+    const name = cleanText(cardScope.find('h2').first().text()) ?? h2Texts[0] ?? null;
+
+    const headline =
+      cleanText(cardScope.find('h2').eq(1).text()) ??
+      h2Texts[1] ??
+      pTexts[0] ??
+      null;
+
+    const location =
+      pTexts.find((text) => (
+        text.includes(',') &&
+        !text.includes('·') &&
+        !text.includes('Contact info')
+      )) ??
+      h2Texts.find((text) => (
+        text.includes(',') &&
+        !text.includes('·') &&
+        !text.includes('Contact info')
+      )) ??
+      null;
+
+    const image =
+      root.find('img[src*="profile-displayphoto"]').first().attr('src') ??
+      getImageUrl($, 'img[src*="profile-displayphoto"]') ??
+      null;
+
+    const backgroundImage =
+      root.find('img[src*="profile-displaybackgroundimage"]').first().attr('src') ??
+      getImageUrl($, 'img[src*="profile-displaybackgroundimage"]') ??
+      null;
+
+    if (!topCard.length && h2Texts.length === 0 && pTexts.length === 0) {
       return {
         url,
         name: null,
@@ -44,67 +87,6 @@ export class LinkedInProfilePageParser implements ProfilePageParser {
         languages: [],
       };
     }
-
-    // -----------------------------
-    // NAME
-    // -----------------------------
-    const name =
-      cleanText(
-        topCard.find('h2').first().text()
-      );
-
-    // -----------------------------
-    // IMAGE
-    // -----------------------------
-    const image =
-      getImageUrl(
-        $,
-        '[data-view-name="profile-top-card"] img[src*="profile-displayphoto"]'
-      );
-
-    // -----------------------------
-    // BACKGROUND IMAGE
-    // -----------------------------
-    const backgroundImage =
-      getImageUrl(
-        $,
-        '[data-view-name="profile-top-card"] img[src*="profile-displaybackgroundimage"]'
-      );
-
-    // -----------------------------
-    // TEXT FIELDS
-    // -----------------------------
-    const paragraphs = topCard
-      .find('p')
-      .map((_, element) => cleanText($(element).text()))
-      .get()
-      .filter((value): value is string => value !== null);
-
-    /*
-     * In the observed top card:
-     *
-     * h2 -> Arfan Shaikh
-     *
-     * p[0] -> 5+ years building products...
-     * p[1] -> NEOSTARTER GmbH
-     * p[2] -> Ponda, Goa, India
-     *
-     * The company is not currently part of your Profile schema,
-     * so we skip it.
-     */
-
-    const headline = paragraphs[0] ?? null;
-
-    const location =
-      paragraphs.find((text) => {
-        // Basic location heuristic.
-        // Improve this if your schema/page format changes.
-        return (
-          text.includes(',') &&
-          !text.includes('·') &&
-          !text.includes('Contact info')
-        );
-      }) ?? null;
 
     return {
       url,

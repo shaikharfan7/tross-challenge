@@ -1,4 +1,3 @@
-
 import { LinkedInClient } from '../linkedin/client.js';
 
 import {
@@ -10,6 +9,11 @@ import {
   LinkedInExperienceParser,
   type ExperienceParser,
 } from '../linkedin/experience-parser.js';
+
+import {
+  LinkedInSkillsParser,
+  type SkillsParser,
+} from '../linkedin/skills-parser.js';
 
 import {
   normalizeProfileUrl,
@@ -25,6 +29,9 @@ export class ProfileService {
 
     private readonly experienceParser: ExperienceParser =
       new LinkedInExperienceParser(),
+
+    private readonly skillsParser: SkillsParser =
+      new LinkedInSkillsParser(),
   ) {}
 
   async getProfile(inputUrl: string): Promise<Profile> {
@@ -38,7 +45,7 @@ export class ProfileService {
       html,
     );
 
-    // 2. Fetch and parse the Experience section
+    // 2. Fetch and parse Experience
     const experienceResponse =
       await this.client.fetchExperience(url);
 
@@ -47,10 +54,29 @@ export class ProfileService {
         experienceResponse,
       );
 
-    // 3. Return the combined profile
+    // 3. Fetch and parse Skills
+    //
+    // Verified: details/skills/ does not always contain skills in its
+    // server-rendered HTML (confirmed empty for at least one tested
+    // profile - 0 entity-collection-item cards). LinkedIn appears to
+    // load skills client-side via a separate internal component
+    // request in that case, which is out of scope for this project
+    // (see source.md "Known Limitations"). This still runs for real
+    // rather than being hardcoded, so it picks up skills on any
+    // profile/account where they are present server-side.
+    const skillsResponse =
+      await this.client.fetchSkills(url);
+
+    const skills =
+      this.skillsParser.parse(
+        skillsResponse,
+      );
+
+    // 4. Return the combined profile
     return {
       ...profile,
       experience,
+      skills,
     };
   }
 }
