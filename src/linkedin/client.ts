@@ -125,6 +125,46 @@ export class LinkedInClient {
     return html;
   }
 
+  /**
+   * Fetches the LinkedIn Licenses & Certifications page HTML.
+   *
+   * Same pattern as fetchExperience: a direct authenticated GET, no
+   * browser, no internal action replay. Whether this page actually
+   * contains certification entries server-side (like experience) or
+   * only page shell (like skills/education) has NOT yet been verified -
+   * see source.md "Verified LinkedIn Findings" once checked.
+   */
+  async fetchCertifications(url: string): Promise<string> {
+    this.assertSession();
+
+    const certificationsUrl = new URL(
+      'details/certifications/',
+      url.endsWith('/') ? url : `${url}/`,
+    );
+
+    const response = await this.fetchImpl(
+      certificationsUrl,
+      {
+        headers: this.createHeaders({
+          accept:
+            'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        }),
+      },
+    );
+
+    this.assertResponse(response);
+
+    const html = await response.text();
+
+    // Temporary debugging output.
+    await writeFile(
+      '/tmp/linkedin-certifications.html',
+      html,
+    );
+
+    return html;
+  }
+
   private assertSession(): void {
     if (!this.options.liAt) {
       throw new LinkedInSessionError();
